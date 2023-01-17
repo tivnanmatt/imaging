@@ -167,10 +167,8 @@ class SpectralAttenuator(nn.Module):
 
         transmission_probability_spectrum = torch.ones(1,nEnergy).to(device)
         for iElement in range(self.nElement):
-            if iElement == 0:
-                mass_attenuation_spectrum = massAttenuationSpectra[:,self.atomic_number[iElement]].reshape(1,nEnergy)
-                transmission_probability_spectrum = transmission_probability_spectrum*torch.exp(-mass_attenuation_spectrum*self.thickness_mm[:,iElement:iElement+1]*self.density_mg_per_mm3[:,iElement:iElement+1])
-
+            mass_attenuation_spectrum = massAttenuationSpectra[:,self.atomic_number[iElement]].reshape(1,nEnergy)
+            transmission_probability_spectrum = transmission_probability_spectrum*torch.exp(-mass_attenuation_spectrum*self.thickness_mm[:,iElement:iElement+1]*self.density_mg_per_mm3[:,iElement:iElement+1])
         return transmission_probability_spectrum
 
     def forward(self, incident_xray_spectrum):
@@ -476,7 +474,7 @@ class SpectralSource_TASMICS_Filter(SpectralSource_TASMICS):
         # define the aluminium filter
         nBatch = self.nBatch
 
-        self.aluminium_filter = SpectralAttenuator(
+        self.filter = SpectralAttenuator(
                                     filter_atomic_number,
                                     filter_density_mg_per_mm3,
                                     filter_thickness_mm,
@@ -516,7 +514,7 @@ class SpectralSource_TASMICS_Filter(SpectralSource_TASMICS):
         source_spectrum = source_spectrum.reshape([self.nBatch, self.nEnergy])
 
         # attenuate the source spectrum by the aluminium filter
-        filter_transmission_probability_spectrum = self.aluminium_filter.compute_transmission_probability_spectrum()
+        filter_transmission_probability_spectrum = self.filter.compute_transmission_probability_spectrum()
         assert filter_transmission_probability_spectrum.shape == (self.nBatch, self.nEnergy), "Something went wrong, filter_transmission_probability_spectrum must be shaped [nBatch x nEnergy]."
         source_spectrum *= filter_transmission_probability_spectrum
 
