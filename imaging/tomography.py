@@ -48,7 +48,7 @@ class CTProjector_ParallelBeam2D(torch.nn.Module):
                 print('Forward Projecting View : ', iTheta, ' of ', self.Ntheta)
 
             # compute the overlap between the voxel trapezoidal footprint and the pixel only for nonzero pixels. Return pixel indices and nonzero areas
-            pixel_index, area_between_pixel_trapezoidal_footprint = self._make_SRT_single_view_sparse(theta_i, y2d, x2d)
+            pixel_index, area_between_pixel_trapezoidal_footprint = self._system_response(theta_i, y2d, x2d)
             num_nonzero_pixels = pixel_index.shape[0]
 
             # need to convert indices and areas to vectors for use with torch.Tensor.index_add_()
@@ -85,7 +85,7 @@ class CTProjector_ParallelBeam2D(torch.nn.Module):
                 print('Back Projecting View : ', iTheta, ' of ', self.Ntheta)
 
             # compute the overlap between the voxel trapezoidal footprint and the pixel only for nonzero pixels. Return pixel indices and nonzero areas
-            pixel_index, area_between_pixel_trapezoidal_footprint = self._make_SRT_single_view_sparse(theta_i, y2d, x2d)
+            pixel_index, area_between_pixel_trapezoidal_footprint = self._system_response(theta_i, y2d, x2d)
             num_nonzero_pixels = pixel_index.shape[0]
 
             # loop through nonzero pixels
@@ -100,7 +100,7 @@ class CTProjector_ParallelBeam2D(torch.nn.Module):
     def _convert_projection_index_to_u(self, projection_index):
         return (projection_index - (self.Nu-1)/2.0)*self.du
 
-    def _make_SRT_single_view_sparse(self, theta_i, y2d, x2d):
+    def _system_response(self, theta_i, y2d, x2d):
 
         # compute the projection
         theta_i = torch.tensor(theta_i)
@@ -145,7 +145,7 @@ class CTProjector_ParallelBeam2D(torch.nn.Module):
             u_A = torch.maximum(u1,u-self.du/2)
             u_B = torch.minimum(u2,u+self.du/2)
             area_between_pixel_trapezoidal_footprint[iPixel] += (u_B>u_A)*(h/(2*(u2-u1 + (u1==u2))))*((u_B-u1)**2.0 - (u_A-u1)**2.0)
-            # area of the center of the trapezoid
+            # area of the center of the trapezoidm
             u_A = torch.maximum(u2,u-self.du/2)
             u_B = torch.minimum(u3,u+self.du/2)
             area_between_pixel_trapezoidal_footprint[iPixel] += (u_B>u_A)*h*(u_B-u_A)
@@ -155,8 +155,6 @@ class CTProjector_ParallelBeam2D(torch.nn.Module):
             area_between_pixel_trapezoidal_footprint[iPixel] += (u_B>u_A)*(h/(2*(u4-u3+ (u3==u4))))*((u_A-u4)**2.0 - (u_B-u4)**2.0)
 
         return pixel_index, area_between_pixel_trapezoidal_footprint 
-
-
 
 if __name__ == '__main__':
 
@@ -200,4 +198,3 @@ if __name__ == '__main__':
     plt.imshow(ATAimg.detach().cpu().numpy(), cmap='gray')
     plt.colorbar()
     plt.show(block=True)
-
