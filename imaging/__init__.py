@@ -1,2 +1,2 @@
 from . import spectral
-from . import tomography
+from .tomography import projector

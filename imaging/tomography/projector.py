@@ -45,7 +45,7 @@ class CTProjector_ParallelBeam2D(torch.nn.Module):
         # loop through thetas
         for iTheta, theta_i in enumerate(self.theta):
             if self.verbose:
-                print('Forward Projecting View : ', iTheta, ' of ', self.Ntheta)
+                print('Forward Projecting View : ', iTheta+1, ' of ', self.Ntheta)
 
             # compute the overlap between the voxel trapezoidal footprint and the pixel only for nonzero pixels. Return pixel indices and nonzero areas
             pixel_index, area_between_pixel_trapezoidal_footprint = self._system_response(theta_i, y2d, x2d)
@@ -82,7 +82,7 @@ class CTProjector_ParallelBeam2D(torch.nn.Module):
         # loop through thetas
         for iTheta, theta_i in enumerate(self.theta):
             if self.verbose:
-                print('Back Projecting View : ', iTheta, ' of ', self.Ntheta)
+                print('Back Projecting View : ', iTheta+1, ' of ', self.Ntheta)
 
             # compute the overlap between the voxel trapezoidal footprint and the pixel only for nonzero pixels. Return pixel indices and nonzero areas
             pixel_index, area_between_pixel_trapezoidal_footprint = self._system_response(theta_i, y2d, x2d)
@@ -161,19 +161,24 @@ if __name__ == '__main__':
     import numpy as np
     from matplotlib import pyplot as plt
 
+    import os
+    os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
     # compute the projection
-    Nx = 512
-    Ny = 512
+    Nx = 128
+    Ny = 128
     dx = 320.0/Nx
     dy = 320.0/Ny
     Nu = np.ceil(np.sqrt(Nx**2.0 + Ny**2.0)*10/8).astype(int) + 1
     du = dx*.8
-    theta = np.linspace(0, np.pi, 500)
+
+    Ntheta = 210
+    theta = np.linspace(0, np.pi, Ntheta)
     myProjector = CTProjector_ParallelBeam2D( Nx, Ny, dx, dy, Nu, du, theta, verbose=True).to(device)
     # myProjector._make_SRT()
     img = torch.zeros([Nx,Ny], dtype=torch.float32).to(device)
     # img[np.floor(Ny/2).astype(np.int32):np.ceil(Ny*.7).astype(np.int32), np.floor(Nx/2).astype(np.int32):np.ceil(Nx*.6).astype(np.int32)] = 1.0
-    img[100:104,100:104] = 1.0
+    img[60:84,60:84] = 1.0
     # proj = myProjector._apply_SRT(img)
     proj = myProjector.forward(img)
 
