@@ -1,2 +1,4 @@
 from . import spectral
-from .tomography import projector
+from . import tomography
+from . import nn
+from . import datasets
