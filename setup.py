@@ -1,5 +1,9 @@
 import setuptools
 
+package_data = {
+    'TASMICSdata': ['./data/TASMICSdata.mat'],
+}
+
 setuptools.setup(
     name="imaging",
     version="0.0.1",
@@ -9,7 +13,8 @@ setuptools.setup(
     description="Physics and Signal Processing Models for Imaging",
     packages=setuptools.find_packages(),
     install_requires=[
-        'torch'
+        'torch',
+        'pydicom'
     ],
-    include_package_data=True
+    package_data=package_data
 )

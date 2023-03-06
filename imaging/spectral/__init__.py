@@ -7,6 +7,19 @@ from scipy import io
 from xraydb import mu_elam 
 from xraydb import material_mu
 
+
+# load TASMICS data which describes bremsstrahlung spectrum
+# hacky solution but works for now
+import pkgutil
+data_bytes = pkgutil.get_data('imaging', 'data/TASMICSdata.mat')
+# write the data to a temporary file called TASMICSDATA.mat
+with open('TASMICSdata.mat', 'wb') as f:
+    f.write(data_bytes)
+spTASMICS = io.loadmat('TASMICSdata.mat')['spTASMICS']
+# delete the temporary file
+import os
+os.remove('TASMICSdata.mat')
+
 # use GPU if available
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -23,8 +36,6 @@ for z in range(1,91):
     massAttenuationSpectra[:,z] = massAttenuationSpectra[:,z]*100 # mm2/g
     massAttenuationSpectra[:,z] = massAttenuationSpectra[:,z]*1e-3 # mm2/mg
 
-# load TASMICS data which describes bremsstrahlung spectrum
-spTASMICS = io.loadmat('TASMICSdata.mat')['spTASMICS']
 
 # compute the source spectrum for a given (list of) kvp value(s)
 def get_TASMICS_Spectrum(kvp: torch.Tensor) -> torch.Tensor:
