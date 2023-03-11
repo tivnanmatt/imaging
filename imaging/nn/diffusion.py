@@ -10,8 +10,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class DiffusionModel(torch.nn.Module):
     def __init__(self,
                 alpha_bar_func,
-                 time_decoder_base_channels=64,
-                 unet_base_channels=64,
+                time_decoder_base_channels=64,
+                unet_base_channels=64,
                 unet_in_channels=32,
                 image_size=64,
                 periodic_pad=False,
@@ -62,7 +62,7 @@ class DiffusionModel(torch.nn.Module):
         # sample random times (different times for each batch element)
         t = torch.rand((x.shape[0], 1, 1, 1)).to(device)
         # sample random noise, normal distribution, mean=0, std=1
-        epsilon = torch.randn((x.shape[0], 1, 64, 64)).to(device)
+        epsilon = torch.randn((x.shape[0], 1, self.image_size, self.image_size)).to(device)
         # this function defines the forward process as a function of x_0, t, and epsilon
         x_t = self.sample_x_t_given_x_0_and_t_and_epsilon(x, t, epsilon)
         # now estimate epsilon given x_t, y, t
@@ -86,7 +86,7 @@ class DiffusionModel(torch.nn.Module):
         # initialize x_t to the forward process input x_0
         x_t = x_0
         # initialize a tensor to hold all the x_t's
-        x_t_all = torch.zeros((num_steps, batch_size, 1, 64, 64)).to(device)
+        x_t_all = torch.zeros((num_steps, batch_size, 1, self.image_size, self.image_size)).to(device)
         for i in range(num_steps):
             # sample next time
             x_t = self.sample_x_t_plus_dt_given_x_t_and_t_and_dt(x_t, t, dt)
@@ -97,16 +97,20 @@ class DiffusionModel(torch.nn.Module):
         return x_t_all
     
     def reverse_process(self, 
-                        y, 
+                        y,
+                        x_T=None,
                         batch_size=1, 
                         num_steps=128,
                         returnFullProcess=True
                         ):
         t = torch.ones((batch_size, 1, 1, 1)).float().to(device)
         dt = 1.0/num_steps
-        x_t = self.sample_x_T_given_y(y)
+        if x_T is None:
+            x_t = self.sample_x_T_given_y(y)
+        else:
+            x_t = x_T
         if returnFullProcess:
-            x_t_all = torch.zeros((num_steps, batch_size, 1, 64, 64)).to(device)
+            x_t_all = torch.zeros((num_steps, batch_size, 1, self.image_size, self.image_size)).to(device)
         for i in range(num_steps):
             # set up the unet and time decoder for this evaluation
             self.unet.eval()
@@ -167,7 +171,7 @@ class DiffusionModel(torch.nn.Module):
         return x_t_minus_dt
     
     def sample_x_T_given_y(self, y):
-        return torch.randn((y.shape[0], 1, 64, 64)).to(device)
+        return torch.randn((y.shape[0], 1, self.image_size, self.image_size)).to(device)
 
 
 
@@ -249,7 +253,7 @@ class ScalarDiffusionModel(DiffusionModel):
         return x_t_minus_dt
     
     def sample_x_T_given_y(self, y):
-        return torch.sqrt(self.noise_variance_func(1+ 0*y))*torch.randn((y.shape[0], 1, 64, 64)).to(device)
+        return torch.sqrt(self.noise_variance_func(1+ 0*y))*torch.randn((y.shape[0], 1, self.image_size, self.image_size)).to(device)
 
 
 
@@ -329,7 +333,7 @@ class DiagonalDiffusionModel(DiffusionModel):
         return x_t_minus_dt
     
     def sample_x_T_given_y(self, y):
-        return torch.sqrt(self.noise_variance_func(1+ 0*y))*torch.randn((y.shape[0], 1, 64, 64)).to(device)
+        return torch.sqrt(self.noise_variance_func(1+ 0*y))*torch.randn((y.shape[0], 1, self.image_size, self.image_size)).to(device)
 
 
 
@@ -406,15 +410,18 @@ class FourierDiffusionModel(DiffusionModel):
         NPS_derivative_t = self.NPS_derivative_func(t)
 
         f = torch.fft.ifft2((MTF_derivative_t/MTF_t)*torch.fft.fft2(x_t, dim=(-2,-1)), dim=(-2,-1)).real
-        g_transfer_function = torch.sqrt(-2*(MTF_derivative_t/MTF_t)*NPS_t + NPS_derivative_t)
+        tmp = -2*(MTF_derivative_t/MTF_t)*NPS_t + NPS_derivative_t
+        # hacky clip.... decide how to deal with this later...probably need to check for invalid processes
+        tmp[tmp<1e-12] = 1e-12
+        g_transfer_function = torch.sqrt(tmp)
         dw = torch.sqrt(torch.tensor(dt))*torch.randn_like(x_t)
         g_dw = torch.fft.ifft2(g_transfer_function*torch.fft.fft2(dw, dim=(-2,-1)), dim=(-2,-1)).real
 
 
-        f = torch.fft.ifft2((MTF_derivative_t/MTF_t)*torch.fft.fft2(x_t, dim=(-2,-1)), dim=(-2,-1)).real
-        g_transfer_function = torch.sqrt(-2*(MTF_derivative_t/MTF_t)*NPS_t + NPS_derivative_t)
-        dw = torch.sqrt(torch.tensor(dt))*torch.randn_like(x_t)
-        g_dw = torch.fft.ifft2(g_transfer_function*torch.fft.fft2(dw, dim=(-2,-1)), dim=(-2,-1)).real
+        # f = torch.fft.ifft2((MTF_derivative_t/MTF_t)*torch.fft.fft2(x_t, dim=(-2,-1)), dim=(-2,-1)).real
+        # g_transfer_function = torch.sqrt(-2*(MTF_derivative_t/MTF_t)*NPS_t + NPS_derivative_t)
+        # dw = torch.sqrt(torch.tensor(dt))*torch.randn_like(x_t)
+        # g_dw = torch.fft.ifft2(g_transfer_function*torch.fft.fft2(dw, dim=(-2,-1)), dim=(-2,-1)).real
         score = -torch.fft.ifft2(torch.sqrt(1/NPS_t)*torch.fft.fft2(epsilon_hat, dim=(-2,-1)), dim=(-2,-1)).real
         g2_score = torch.fft.ifft2(g_transfer_function*g_transfer_function*torch.fft.fft2(score, dim=(-2,-1)), dim=(-2,-1)).real
         
@@ -424,16 +431,19 @@ class FourierDiffusionModel(DiffusionModel):
         
         return x_t_plus_dt
 
-    
     def sample_x_T_given_y(self, y):
 
-        x_0 = y
-        epsilon = torch.randn_like(y)
-        t = torch.ones((y.shape[0], 1, 1, 1)).to(device)
+        return y
+    
+    # def sample_x_T_given_y(self, y):
 
-        x_T = self.sample_x_t_given_x_0_and_t_and_epsilon(x_0, t, epsilon)
+    #     x_0 = y
+    #     epsilon = torch.randn_like(y)
+    #     t = torch.ones((y.shape[0], 1, 1, 1)).to(device)
 
-        return x_T
+    #     x_T = self.sample_x_t_given_x_0_and_t_and_epsilon(x_0, t, epsilon)
+
+    #     return x_T
 
 
 

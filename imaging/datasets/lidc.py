@@ -1,12 +1,12 @@
 
 import numpy as np
 
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg') # dont use X11
+# import matplotlib.pyplot as plt
+# import matplotlib
+# matplotlib.use('Agg') # dont use X11
 import pydicom
 
-plt.style.use('dark_background')
+# plt.style.use('dark_background')
 
 import torch
 
